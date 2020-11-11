@@ -20,25 +20,47 @@ cfg = {
 
 class VGG(nn.Module):
 
-    def __init__(self, features, num_class=100):
+    def __init__(self, features, num_classes=100,embedding=False):
         super().__init__()
         self.features = features
 
-        self.classifier = nn.Sequential(
-            nn.Linear(512, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, num_class)
-        )
+        self.embedding = embedding
+        if embedding:
+            print("using embedding layer")
+            self.embed = nn.Linear(num_classes,num_classes,bias=False)
+            self.embed.weight.requires_grad = False
+            weights = torch.zeros_like(self.embed.weight)
+            for i in range(num_class):
+                weights[i,i] = (-1.0) ** i
+            print(weights)
+            self.embed.weight.data = weights
+            self.classifier = nn.Sequential(
+                nn.Linear(512, 4096),
+                nn.ReLU(inplace=True),
+                nn.Dropout(),
+                nn.Linear(4096, 4096),
+                nn.ReLU(inplace=True),
+                nn.Dropout(),
+                nn.Linear(4096, num_classes)
+            )
+
+        else:
+            self.classifier = nn.Sequential(
+                nn.Linear(512, 4096),
+                nn.ReLU(inplace=True),
+                nn.Dropout(),
+                nn.Linear(4096, 4096),
+                nn.ReLU(inplace=True),
+                nn.Dropout(),
+                nn.Linear(4096, num_classes)
+            )    
 
     def forward(self, x):
         output = self.features(x)
         output = output.view(output.size()[0], -1)
         output = self.classifier(output)
-
+        if self.embedding:
+            output = self.embed(output)
         return output
 
 def make_layers(cfg, batch_norm=False):
@@ -60,16 +82,29 @@ def make_layers(cfg, batch_norm=False):
 
     return nn.Sequential(*layers)
 
-def vgg11_bn():
-    return VGG(make_layers(cfg['A'], batch_norm=True))
+def vgg11(num_classes=100):
+    return VGG(make_layers(cfg['A'], batch_norm=False),num_classes=num_classes)
 
-def vgg13_bn():
-    return VGG(make_layers(cfg['B'], batch_norm=True))
+def vgg13(num_classes=100):
+    return VGG(make_layers(cfg['B'], batch_norm=False),num_classes=num_classes)
 
-def vgg16_bn():
-    return VGG(make_layers(cfg['D'], batch_norm=True))
+def vgg16(num_classes=100):
+    return VGG(make_layers(cfg['D'], batch_norm=False),num_classes=num_classes)
 
-def vgg19_bn():
-    return VGG(make_layers(cfg['E'], batch_norm=True))
+def vgg19(num_classes=100):
+    return VGG(make_layers(cfg['E'], batch_norm=False),num_classes=num_classes)
+
+
+def vgg11_bn(num_classes=100):
+    return VGG(make_layers(cfg['A'], batch_norm=True),num_classes=num_classes)
+
+def vgg13_bn(num_classes=100):
+    return VGG(make_layers(cfg['B'], batch_norm=True),num_classes=num_classes)
+
+def vgg16_bn(num_classes=100):
+    return VGG(make_layers(cfg['D'], batch_norm=True),num_classes=num_classes)
+
+def vgg19_bn(num_classes=100):
+    return VGG(make_layers(cfg['E'], batch_norm=True),num_classes=num_classes)
 
 
