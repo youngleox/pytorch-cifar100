@@ -63,7 +63,7 @@ def get_network(args):
         net = densenet201()
     elif args.net == 'googlenet':
         from models.googlenet import googlenet
-        net = googlenet()
+        net = googlenet(num_classes=nclass)
     elif args.net == 'inceptionv3':
         from models.inceptionv3 import inceptionv3
         net = inceptionv3()
@@ -75,7 +75,35 @@ def get_network(args):
         net = inception_resnet_v2()
     elif args.net == 'xception':
         from models.xception import xception
-        net = xception()
+        net = xception(num_classes=nclass)
+    elif args.net == 'scnet':
+        from models.sphereconvnet import sphereconvnet
+        net = sphereconvnet(num_classes=nclass)
+    elif args.net == 'sphereresnet18':
+        from models.sphereconvnet import resnet18
+        net = resnet18(num_classes=nclass)
+    elif args.net == 'sphereresnet32':
+        from models.sphereconvnet import sphereresnet32
+        net = sphereresnet32(num_classes=nclass)
+    elif args.net == 'plainresnet32':
+        from models.sphereconvnet import plainresnet32
+        net = plainresnet32(num_classes=nclass)
+    elif args.net == 'ynet18':
+        from models.ynet import resnet18
+        net = resnet18(num_classes=nclass)
+    elif args.net == 'ynet34':
+        from models.ynet import resnet34
+        net = resnet34(num_classes=nclass)
+    elif args.net == 'ynet50':
+        from models.ynet import resnet50
+        net = resnet50(num_classes=nclass)
+    elif args.net == 'ynet101':
+        from models.ynet import resnet101
+        net = resnet101(num_classes=nclass)
+    elif args.net == 'ynet152':
+        from models.ynet import resnet152
+        net = resnet152(num_classes=nclass)
+
     elif args.net == 'resnet18':
         from models.resnet import resnet18
         net = resnet18(num_classes=nclass)
@@ -93,28 +121,28 @@ def get_network(args):
         net = resnet152(num_classes=nclass)
     elif args.net == 'preactresnet18':
         from models.preactresnet import preactresnet18
-        net = preactresnet18()
+        net = preactresnet18(num_classes=nclass)
     elif args.net == 'preactresnet34':
         from models.preactresnet import preactresnet34
-        net = preactresnet34()
+        net = preactresnet34(num_classes=nclass)
     elif args.net == 'preactresnet50':
         from models.preactresnet import preactresnet50
-        net = preactresnet50()
+        net = preactresnet50(num_classes=nclass)
     elif args.net == 'preactresnet101':
         from models.preactresnet import preactresnet101
-        net = preactresnet101()
+        net = preactresnet101(num_classes=nclass)
     elif args.net == 'preactresnet152':
         from models.preactresnet import preactresnet152
-        net = preactresnet152()
+        net = preactresnet152(num_classes=nclass)
     elif args.net == 'resnext50':
         from models.resnext import resnext50
-        net = resnext50()
+        net = resnext50(num_classes=nclass)
     elif args.net == 'resnext101':
         from models.resnext import resnext101
-        net = resnext101()
+        net = resnext101(num_classes=nclass)
     elif args.net == 'resnext152':
         from models.resnext import resnext152
-        net = resnext152()
+        net = resnext152(num_classes=nclass)
     elif args.net == 'shufflenet':
         from models.shufflenet import shufflenet
         net = shufflenet()
@@ -129,10 +157,10 @@ def get_network(args):
         net = mobilenet(num_classes=nclass)
     elif args.net == 'mobilenetv2':
         from models.mobilenetv2 import mobilenetv2
-        net = mobilenetv2()
+        net = mobilenetv2(num_classes=nclass)
     elif args.net == 'nasnet':
         from models.nasnet import nasnet
-        net = nasnet()
+        net = nasnet(num_classes=nclass)
     elif args.net == 'attention56':
         from models.attention import attention56
         net = attention56()
@@ -141,19 +169,19 @@ def get_network(args):
         net = attention92()
     elif args.net == 'seresnet18':
         from models.senet import seresnet18
-        net = seresnet18()
+        net = seresnet18(num_classes=nclass)
     elif args.net == 'seresnet34':
         from models.senet import seresnet34
-        net = seresnet34()
+        net = seresnet34(num_classes=nclass)
     elif args.net == 'seresnet50':
         from models.senet import seresnet50
-        net = seresnet50()
+        net = seresnet50(num_classes=nclass)
     elif args.net == 'seresnet101':
         from models.senet import seresnet101
-        net = seresnet101()
+        net = seresnet101(num_classes=nclass)
     elif args.net == 'seresnet152':
         from models.senet import seresnet152
-        net = seresnet152()
+        net = seresnet152(num_classes=nclass)
 
     else:
         print('the network name you have entered is not supported yet')
