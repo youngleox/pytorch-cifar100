@@ -1,7 +1,10 @@
 """SphereConvnet in pytorch (WIP)
 
+This is an unofficial implementation of sphere convolutional networks from:
 
-orthogonal constraint is not implemented
+Liu et al., 2017. Deep Hyperspherical Learning
+
+Orthogonal constraint is not implemented
 
 """
 
@@ -110,7 +113,7 @@ class SphereConvLayer(nn.Module):
             conv = nn.ReLU(inplace=True)(conv)
         return conv
 
-class BasicBlock(nn.Module):
+class SphereBasicBlock(nn.Module):
     """Basic Block with sphere convolution layer for resnet 18 and resnet 34
 
     """
@@ -183,6 +186,79 @@ class BasicBlock(nn.Module):
             output = nn.ReLU(inplace=True)(output*self.scale)
             output = self.conv2(output)
             #print('output shape: {}, residual shape: {}'.format(output.shape, residual.shape))
+            output = nn.ReLU(inplace=True)(output*self.scale + residual)
+            return output 
+        else:
+            output = self.conv1(x)
+            output = nn.ReLU(inplace=True)(output*self.scale)
+            output = self.conv2(output)
+            output = nn.ReLU(inplace=True)(output*self.scale)
+            return output 
+
+class BasicBlock(nn.Module):
+    """Basic Block for resnet 18 and resnet 34
+
+    """
+
+    #BasicBlock and BottleNeck block
+    #have different output size
+    #we use class attribute expansion
+    #to distinct
+    expansion = 1
+
+    def __init__(self, in_channels, out_channels, stride=1, affine=True,bn=True,bias=False,res=True,scale=1.0,momentum=0.1):
+        super().__init__()
+        self.scale = scale
+        self.bn = bn
+        self.res = res
+        print('non linearity scale: {}'.format(scale))
+        #residual function
+        if self.bn:
+            self.conv1 = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=bias),
+                nn.BatchNorm2d(out_channels, affine=affine,momentum=momentum)
+            )
+            self.conv2 = nn.Sequential(
+                nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=bias),
+                nn.BatchNorm2d(out_channels * BasicBlock.expansion, affine=affine,momentum=momentum)
+            )
+
+            #shortcut
+            self.shortcut = nn.Sequential()
+
+            #the shortcut output dimension is not the same with residual function
+            #use 1*1 convolution to match the dimension
+            if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
+                self.shortcut = nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=bias),
+                    nn.BatchNorm2d(out_channels * BasicBlock.expansion, affine=affine,momentum=momentum)
+                )
+        else:
+            print("batch norm disabled")
+            self.conv1 = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=bias)
+            )
+            self.conv2 = nn.Sequential(
+                nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=bias)
+            )
+
+            #shortcut
+            self.shortcut = nn.Sequential()
+
+            #the shortcut output dimension is not the same with residual function
+            #use 1*1 convolution to match the dimension
+            if (stride != 1 or in_channels != BasicBlock.expansion * out_channels) and self.res:
+                self.shortcut = nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=bias)
+                    #nn.BatchNorm2d(out_channels * BasicBlock.expansion, affine=affine)
+                )
+
+    def forward(self, x):
+        if self.res:
+            residual = self.shortcut(x)
+            output = self.conv1(x)
+            output = nn.ReLU(inplace=True)(output*self.scale)
+            output = self.conv2(output)
             output = nn.ReLU(inplace=True)(output*self.scale + residual)
             return output 
         else:
@@ -266,9 +342,6 @@ class BottleNeck(nn.Module):
             output = self.conv3(output)
             output = nn.ReLU(inplace=True)(output*self.scale)
             return output 
-
-def SRELU(x):
-    return F.ReLU(x*1.4142)
 
 class ResNet(nn.Module):
 
@@ -371,6 +444,7 @@ class ResNet(nn.Module):
 
         return output *self.out_scale + self.out_bias
 
+#plain sphere conv net (9 layer CNN) in paper section 4.2
 class SphereConvNet(nn.Module):
 
     def __init__(self, block=None, num_block=3, num_classes=100,affine=True,bn=True,bias=False,nl=nn.ReLU):
@@ -436,6 +510,7 @@ class SphereConvNet(nn.Module):
         output = output.view(output.size(0), -1)
         return output
 
+#sphere resnet in paper section 4.5
 class SphereResNet(nn.Module):
 
     def __init__(self, block, num_block, num_classes=100,affine=True,bn=True,bias=False,nl=nn.ReLU):
@@ -486,7 +561,8 @@ class SphereResNet(nn.Module):
                 nn.ReLU(inplace=True))
         else:
             self.conv1 = nn.Sequential(
-                SphereConvLayer(3, 96, kernel_size=3, padding=1, bias=bias,norm='linear'),
+                SphereConvLayer(3, 96, kernel_size=3, padding=1, bias=bias,
+                                relu=False,bn=False,norm='linear'),
                 #nn.BatchNorm2d(64, affine=affine),
                 nn.ReLU(inplace=True))
         #we use a different inputsize than the original paper
@@ -530,40 +606,136 @@ class SphereResNet(nn.Module):
 
         return output
 
+#plain resnet in paper section 4.5
+class PlainResNet(nn.Module):
+
+    def __init__(self, block, num_block, num_classes=100,affine=True,bn=True,bias=False,nl=nn.ReLU):
+        #self.nl = SRELU
+        super().__init__()
+        self.out_clamp = False
+        self.momentum = 0.1 # default 0.1
+        self.out_nl = nn.ReLU6(inplace=True)
+        self.out_scale = 1.0
+        self.out_bias = 0.0
+        scale = 1.0 #1.0/1.414
+        res = True #True 
+        affine = True # False 
+        bn = True #False
+        bias = False
+        self.out_bn_flag = False  #True
+
+        vanilla = False #turn on this to use default settings
+        
+        if vanilla:
+            print("vanilla")
+            self.momentum = 0.1
+            self.out_scale = 1.0
+            self.out_bias = 0.0
+            scale = 1.0 
+            res = True #False
+            affine = True # False
+            bn = True #False
+            bias = False
+            self.out_bn_flag = False #True
+        if not res:
+            print("no res!")
+        if not bn:
+            print("no bn!")
+        if not bias:
+            print("no bias!")
+        if not affine:
+            print("no affine!")
+        width = 1
+        self.in_channels = 96
+        
+        if bn:
+            self.conv1 = nn.Sequential(
+                nn.Conv2d(3, 96, kernel_size=3, padding=1, bias=bias),
+                nn.BatchNorm2d(96*width, affine=affine),
+                nn.ReLU(inplace=True))
+        else:
+            self.conv1 = nn.Sequential(
+                nn.Conv2d(3, 96, kernel_size=3, padding=1, bias=bias),
+                nn.ReLU(inplace=True))
+        #we use a different inputsize than the original paper
+        #so conv2_x's stride is 1
+        self.conv2_x = self._make_layer(block, 96, num_block[0], 1, affine=affine,bn=bn,bias=bias,
+                                        res=res,scale=scale,momentum=self.momentum)
+        self.conv3_x = self._make_layer(block, 192, num_block[1], 2, affine=affine,bn=bn,bias=bias,
+                                        res=res,scale=scale,momentum=self.momentum)
+        self.conv4_x = self._make_layer(block, 384, num_block[2], 2, affine=affine,bn=bn,bias=bias,
+                                        res=res,scale=scale,momentum=self.momentum)
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.fc = nn.Linear(384, num_classes,bias=True)
+
+    def _make_layer(self, block, out_channels, num_blocks, stride, 
+                    affine=True,bn=True,bias=True,res=True,scale=1.0,
+                    momentum=0.1):
+
+        # we have num_block blocks per layer, the first block
+        # could be 1 or 2, other blocks would always be 1
+        strides = [stride] + [1] * (num_blocks - 1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_channels, out_channels, stride, affine=affine,
+                                bn=bn,bias=bias,res=res,scale=scale,momentum=momentum,
+                                ))
+            self.in_channels = out_channels * block.expansion
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        output = self.conv1(x)
+
+        output = self.conv2_x(output)
+        output = self.conv3_x(output)
+        output = self.conv4_x(output)
+        output = self.avg_pool(output)
+        output = output.view(output.size(0), -1)
+        output = self.fc(output)         
+
+        return output
+
 def sphereconvnet(num_classes=100):
-    """ return a ResNet 18 object
+    """ return a 9 layer CNN
     """
     return SphereConvNet(num_classes=num_classes)
 
 def sphereresnet32(num_classes=100):
-    """ return a ResNet 32 object
+    """ return a SphereResNet 32 object
     """
-    return SphereResNet(BasicBlock, [5, 5, 5], num_classes=num_classes)
+    return SphereResNet(SphereBasicBlock, [5, 5, 5], num_classes=num_classes)
 
-def resnet18(num_classes=100):
-    """ return a ResNet 18 object
+def plainresnet32(num_classes=100):
+    """ return a PlainResNet 32 object
     """
-    return ResNet(BasicBlock, [2, 2, 2, 2],num_classes=num_classes)
+    return PlainResNet(BasicBlock, [5, 5, 5], num_classes=num_classes)
 
-def resnet34(num_classes=100):
-    """ return a ResNet 34 object
-    """
-    return ResNet(BasicBlock, [3, 4, 6, 3],num_classes=num_classes)
+# def resnet18(num_classes=100):
+#     """ return a ResNet 18 object
+#     """
+#     return ResNet(BasicBlock, [2, 2, 2, 2],num_classes=num_classes)
 
-def resnet50(num_classes=100):
-    """ return a ResNet 50 object
-    """
-    return ResNet(BottleNeck, [3, 4, 6, 3],num_classes=num_classes)
+# def resnet34(num_classes=100):
+#     """ return a ResNet 34 object
+#     """
+#     return ResNet(BasicBlock, [3, 4, 6, 3],num_classes=num_classes)
 
-def resnet101(num_classes=100):
-    """ return a ResNet 101 object
-    """
-    return ResNet(BottleNeck, [3, 4, 23, 3],num_classes=num_classes)
+# def resnet50(num_classes=100):
+#     """ return a ResNet 50 object
+#     """
+#     return ResNet(BottleNeck, [3, 4, 6, 3],num_classes=num_classes)
 
-def resnet152(num_classes=100):
-    """ return a ResNet 152 object
-    """
-    return ResNet(BottleNeck, [3, 8, 36, 3])
+# def resnet101(num_classes=100):
+#     """ return a ResNet 101 object
+#     """
+#     return ResNet(BottleNeck, [3, 4, 23, 3],num_classes=num_classes)
+
+# def resnet152(num_classes=100):
+#     """ return a ResNet 152 object
+#     """
+#     return ResNet(BottleNeck, [3, 8, 36, 3])
 
 
 
